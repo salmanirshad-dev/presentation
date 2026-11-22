@@ -126,19 +126,20 @@
     color: #cbd5e1;
     font-size: 14px;
     font-weight: 600;
-    padding: 14px 20px;
+    padding: 15px 20px;
     border-radius: 14px;
     display: flex;
     align-items: center;
     justify-content: center;
     gap: 8px;
     cursor: pointer;
-    transition: all 0.12s ease;
+    transition: transform 0.1s ease, background 0.1s ease;
+    touch-action: manipulation;
   }
-  .fs-btn:active {
+  .fs-btn:active, .fs-btn.pressed {
     background: #2563eb;
     color: #fff;
-    transform: scale(0.98);
+    transform: scale(0.96);
   }
 
   /* Main Nav Buttons */
@@ -170,8 +171,8 @@
     border: 1.5px solid #293852;
     color: #94a3b8;
   }
-  .btn-prev:active {
-    transform: scale(0.96);
+  .btn-prev:active, .btn-prev.pressed {
+    transform: scale(0.95);
     background: #202c42;
     color: #fff;
   }
@@ -181,9 +182,9 @@
     color: #ffffff;
     box-shadow: 0 8px 24px var(--blue-glow);
   }
-  .btn-next:active {
-    transform: scale(0.96);
-    filter: brightness(1.15);
+  .btn-next:active, .btn-next.pressed {
+    transform: scale(0.95);
+    filter: brightness(1.2);
     box-shadow: 0 4px 12px var(--blue-glow);
   }
   .btn-sub {
@@ -192,6 +193,31 @@
     text-transform: uppercase;
     letter-spacing: 0.1em;
     opacity: 0.8;
+  }
+
+  /* Toast Notification */
+  .toast {
+    position: fixed;
+    bottom: 28px;
+    left: 50%;
+    transform: translateX(-50%) translateY(40px);
+    background: rgba(30, 41, 59, 0.96);
+    border: 1px solid #334155;
+    color: #f8fafc;
+    font-size: 13px;
+    font-weight: 600;
+    padding: 8px 18px;
+    border-radius: 100px;
+    opacity: 0;
+    pointer-events: none;
+    transition: transform 0.2s cubic-bezier(0.2, 0.8, 0.2, 1), opacity 0.2s ease;
+    z-index: 999;
+    box-shadow: 0 10px 25px rgba(0,0,0,0.4);
+    white-space: nowrap;
+  }
+  .toast.show {
+    transform: translateX(-50%) translateY(0);
+    opacity: 1;
   }
 
   /* Room details */
@@ -223,17 +249,17 @@
     </div>
   </div>
 
-  <button class="fs-btn" id="btn-fullscreen">
+  <button class="fs-btn" id="btn-fullscreen" type="button">
     <span>⛶</span> Toggle Fullscreen on Screen
   </button>
 
   <div class="nav-grid">
-    <button class="btn-action btn-prev" id="btn-prev">
+    <button class="btn-action btn-prev" id="btn-prev" type="button">
       <span style="font-size:36px">‹</span>
       <span>Left</span>
       <span class="btn-sub">Previous</span>
     </button>
-    <button class="btn-action btn-next" id="btn-next">
+    <button class="btn-action btn-next" id="btn-next" type="button">
       <span style="font-size:36px">›</span>
       <span>Right</span>
       <span class="btn-sub">Next Slide</span>
@@ -243,6 +269,8 @@
   <div class="footer-bar">
     Room: <strong id="room-name" style="color:#94a3b8">...</strong> · Sub-40ms Supabase Realtime
   </div>
+
+  <div class="toast" id="toast"></div>
 
 <script>
   const SUPABASE_URL = 'https://ytyuucutzaqjjsqjviyq.supabase.co';
@@ -258,6 +286,18 @@
   const currSlideEl = document.getElementById('curr-slide');
   const totalSlidesEl = document.getElementById('total-slides');
   const progressBar = document.getElementById('progress-bar');
+  const toastEl = document.getElementById('toast');
+
+  let toastTimer = null;
+  function showToast(msg) {
+    if (!toastEl) return;
+    toastEl.textContent = msg;
+    toastEl.classList.add('show');
+    clearTimeout(toastTimer);
+    toastTimer = setTimeout(() => {
+      toastEl.classList.remove('show');
+    }, 1400);
+  }
 
   // Supabase Client
   const client = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
@@ -275,6 +315,9 @@
     progressBar.style.width = pct + '%';
   }
 
+  let isSubscribed = false;
+  const pendingActions = [];
+
   // Listen for slide updates broadcast from the Smart Board
   channel
     .on('broadcast', { event: 'slide-state' }, ({ payload }) => {
@@ -284,20 +327,23 @@
     })
     .subscribe((status) => {
       if (status === 'SUBSCRIBED') {
+        isSubscribed = true;
         statusBadge.className = 'status-badge connected';
         statusText.textContent = 'Connected';
-        // Request current state from board
+        // Send any queued action
+        while (pendingActions.length > 0) {
+          const act = pendingActions.shift();
+          rawSend(act);
+        }
         sendAction('sync');
       } else if (status === 'CLOSED' || status === 'CHANNEL_ERROR') {
+        isSubscribed = false;
         statusBadge.className = 'status-badge disconnected';
         statusText.textContent = 'Disconnected';
       }
     });
 
-  function sendAction(action) {
-    if (navigator.vibrate) {
-      navigator.vibrate(25);
-    }
+  function rawSend(action) {
     channel.send({
       type: 'broadcast',
       event: 'slide-action',
@@ -305,21 +351,49 @@
     });
   }
 
-  // Fast Touch / Click bindings
-  document.getElementById('btn-prev').addEventListener('pointerdown', (e) => {
-    e.preventDefault();
-    sendAction('prev');
-  });
+  function sendAction(action, toastMsg) {
+    if (navigator.vibrate) {
+      try { navigator.vibrate(25); } catch(e){}
+    }
+    if (toastMsg) showToast(toastMsg);
 
-  document.getElementById('btn-next').addEventListener('pointerdown', (e) => {
-    e.preventDefault();
-    sendAction('next');
-  });
+    if (!isSubscribed) {
+      pendingActions.push(action);
+      return;
+    }
+    rawSend(action);
+  }
 
-  document.getElementById('btn-fullscreen').addEventListener('pointerdown', (e) => {
-    e.preventDefault();
-    sendAction('fullscreen');
-  });
+  // Universal fast-touch button binding
+  function bindTouchButton(id, action, label) {
+    const btn = document.getElementById(id);
+    if (!btn) return;
+
+    let fired = false;
+
+    const fire = () => {
+      btn.classList.add('pressed');
+      setTimeout(() => btn.classList.remove('pressed'), 140);
+      sendAction(action, label);
+    };
+
+    btn.addEventListener('touchstart', (e) => {
+      fired = true;
+      fire();
+    }, { passive: true });
+
+    btn.addEventListener('click', () => {
+      if (fired) {
+        fired = false;
+        return;
+      }
+      fire();
+    });
+  }
+
+  bindTouchButton('btn-prev', 'prev', '‹ Previous Slide');
+  bindTouchButton('btn-next', 'next', 'Next Slide ›');
+  bindTouchButton('btn-fullscreen', 'fullscreen', '⛶ Fullscreen sent to screen');
 </script>
 </body>
 </html>
