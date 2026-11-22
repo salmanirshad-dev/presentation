@@ -1,25 +1,38 @@
 # Mathematics Presentation: Homogeneous Functions & Euler's Theorem
 
-Web-based presentation slides for University of Kashmir.
+Web-based interactive presentation slides for University of Kashmir.
 
 - **Topic:** Homogeneous Functions & Euler's Theorem (Calculus)
 - **Presented by:** Salman Irshad (Roll No. 07)
 
-## 🌐 Live Presentation Link
+---
 
-Once GitHub Pages is enabled for this repository, you can open and present this directly from any browser or screen:
+## 🌐 Live Links
 
-👉 **[https://salmanirshad-dev.github.io/presentation/](https://salmanirshad-dev.github.io/presentation/)**
+- **Main Presentation (Smart Board / Projector):**  
+  👉 **[https://salmanirshad-dev.github.io/presentation/](https://salmanirshad-dev.github.io/presentation/)**
 
-### How to enable GitHub Pages (if not already enabled):
-1. Go to repository **[Settings > Pages](https://github.com/salmanirshad-dev/presentation/settings/pages)**.
-2. Under **Build and deployment > Source**, select **Deploy from a branch**.
-3. Under **Branch**, choose `main` and folder `/ (root)`.
-4. Click **Save**. Within 1–2 minutes, your slides will be live at the link above!
+- **Phone Remote Control:**  
+  👉 **[https://salmanirshad-dev.github.io/presentation/remote.html](https://salmanirshad-dev.github.io/presentation/remote.html)**  
+  *(Or simply click the 📱 button on the main screen to scan the QR code with your phone camera!)*
 
 ---
 
-## ⌨️ Presentation Controls
+## 📱 Controlling the Presentation with Your Phone
+
+1. Open the presentation on the smart board screen: `https://salmanirshad-dev.github.io/presentation/`
+2. Click the **📱** button in the bottom-right corner of the screen.
+3. Scan the QR code with your phone's camera (or open `remote.html` directly).
+4. You get 3 instant controls powered by **Supabase Realtime Broadcast (<40ms latency)**:
+   - **Left / Previous (`‹`)**: Goes to the previous slide
+   - **Right / Next (`›`)**: Advances to the next slide
+   - **Fullscreen (`⛶`)**: Toggles fullscreen on the smart board
+   - **Haptic Vibration**: Gives a subtle buzz on your phone when tapped
+   - **Live Slide Counter**: Shows `Slide X / 8` directly on your phone
+
+---
+
+## ⌨️ Smart Board / Desktop Controls
 
 - **Next Slide:** `Right Arrow`, `Down Arrow`, `Spacebar`, `PageDown`, `Enter`, or click `›`
 - **Previous Slide:** `Left Arrow`, `Up Arrow`, `PageUp`, `Backspace`, or click `‹`

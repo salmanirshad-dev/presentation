@@ -4,6 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Homogeneous Functions & Euler's Theorem | University of Kashmir</title>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <style>
   :root{
     --ink:#172235; --muted:#64748b; --blue:#2457d6; --blue2:#eaf0ff;
@@ -91,6 +92,19 @@
   .nav-btn{width:38px;height:38px;border-radius:10px;border:1px solid var(--line);background:rgba(255,255,255,0.85);backdrop-filter:blur(6px);color:var(--ink);cursor:pointer;display:grid;place-items:center;font-size:16px;user-select:none;transition:background .15s,transform .15s}
   .nav-btn:hover{background:#fff;transform:scale(1.05);border-color:#b9c9f5}
   .nav-btn:active{transform:scale(0.95)}
+  /* QR Code Remote Modal */
+  .remote-modal-backdrop{position:fixed;inset:0;background:rgba(15,23,42,0.65);backdrop-filter:blur(6px);display:none;place-items:center;z-index:100}
+  .remote-modal-backdrop.open{display:grid}
+  .remote-modal{background:#ffffff;border:1px solid var(--line);border-radius:22px;padding:26px 28px;max-width:340px;width:90%;text-align:center;box-shadow:0 24px 48px rgba(0,0,0,0.18);position:relative}
+  .remote-modal h3{font-size:19px;margin-bottom:6px;color:var(--ink)}
+  .remote-modal p{font-size:13px;color:var(--muted);margin-bottom:16px}
+  .remote-qr{width:210px;height:210px;margin:0 auto 14px;border-radius:14px;border:1px solid #e2e8f0;display:block;background:#f8fafc}
+  .remote-modal-close{position:absolute;top:14px;right:14px;background:none;border:none;font-size:18px;cursor:pointer;color:var(--muted);width:32px;height:32px;border-radius:50%;display:grid;place-items:center}
+  .remote-modal-close:hover{background:#f1f5f9;color:var(--ink)}
+  .remote-status{display:inline-flex;align-items:center;gap:6px;font-size:12px;font-weight:600;padding:5px 12px;border-radius:100px;background:#f1f5f9;color:var(--muted)}
+  .remote-status.connected{background:#eaf7f1;color:var(--green)}
+  .remote-status .status-dot{width:8px;height:8px;border-radius:50%;background:#eab308}
+  .remote-status.connected .status-dot{background:var(--green)}
 </style>
 </head>
 <body>
@@ -237,14 +251,98 @@
 </main>
 
 <div class="nav-controls" aria-label="Slide navigation">
+  <button class="nav-btn" id="btn-remote" title="Phone Remote (QR Code)">📱</button>
   <button class="nav-btn" id="btn-prev" title="Previous (Left Arrow / PageUp)">‹</button>
   <button class="nav-btn" id="btn-next" title="Next (Right Arrow / PageDown / Space)">›</button>
   <button class="nav-btn" id="btn-fs" title="Toggle Fullscreen (F)">⛶</button>
 </div>
 
+<div class="remote-modal-backdrop" id="remote-modal">
+  <div class="remote-modal">
+    <button class="remote-modal-close" id="btn-close-remote" aria-label="Close">✕</button>
+    <h3>📱 Phone Remote</h3>
+    <p>Scan with your phone camera to control this presentation in real time.</p>
+    <img class="remote-qr" id="remote-qr-img" alt="Scan to connect remote" src="" />
+    <div class="remote-status" id="screen-status">
+      <span class="status-dot"></span>
+      <span id="screen-status-text">Ready · Scan QR Code</span>
+    </div>
+    <div style="margin-top:14px">
+      <a id="remote-link" href="#" target="_blank" style="font-size:11px;color:var(--blue);text-decoration:none;word-break:break-all;">Open remote in new tab</a>
+    </div>
+  </div>
+</div>
+
 <script>
   const slides = [...document.querySelectorAll('.slide')];
   let current = 0;
+
+  // Supabase Realtime Configuration
+  const SUPABASE_URL = 'https://ytyuucutzaqjjsqjviyq.supabase.co';
+  const SUPABASE_ANON_KEY = 'sb_publishable_MMO2PmIOpVuNgBiXGn2rzQ_28pbPcJn';
+
+  const params = new URLSearchParams(window.location.search);
+  const room = params.get('room') || 'math07';
+
+  // Build the Remote URL & QR Code
+  const remoteUrl = new URL('remote.html?room=' + encodeURIComponent(room), window.location.href).href;
+  const qrImg = document.getElementById('remote-qr-img');
+  qrImg.src = 'https://api.qrserver.com/v1/create-qr-code/?size=220x220&data=' + encodeURIComponent(remoteUrl);
+  document.getElementById('remote-link').href = remoteUrl;
+
+  const remoteModal = document.getElementById('remote-modal');
+  document.getElementById('btn-remote').addEventListener('click', () => {
+    remoteModal.classList.toggle('open');
+  });
+  document.getElementById('btn-close-remote').addEventListener('click', () => {
+    remoteModal.classList.remove('open');
+  });
+  remoteModal.addEventListener('click', (e) => {
+    if(e.target === remoteModal) remoteModal.classList.remove('open');
+  });
+
+  // Supabase Client for Realtime Broadcast
+  const sbClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
+    realtime: { params: { eventsPerSecond: 20 } }
+  });
+
+  const remoteChannel = sbClient.channel(`presentation-${room}`, {
+    config: { broadcast: { ack: false } }
+  });
+
+  function broadcastState(){
+    remoteChannel.send({
+      type: 'broadcast',
+      event: 'slide-state',
+      payload: { current: current + 1, total: slides.length }
+    });
+  }
+
+  const screenStatus = document.getElementById('screen-status');
+  const screenStatusText = document.getElementById('screen-status-text');
+
+  remoteChannel
+    .on('broadcast', { event: 'slide-action' }, ({ payload }) => {
+      if(!payload) return;
+      if (screenStatus) {
+        screenStatus.className = 'remote-status connected';
+        screenStatusText.textContent = 'Phone connected!';
+      }
+      if(payload.action === 'next') {
+        nextSlide();
+      } else if(payload.action === 'prev') {
+        prevSlide();
+      } else if(payload.action === 'fullscreen') {
+        toggleFullscreen();
+      } else if(payload.action === 'sync') {
+        broadcastState();
+      }
+    })
+    .subscribe((status) => {
+      if(status === 'SUBSCRIBED') {
+        broadcastState();
+      }
+    });
 
   function showSlide(index, updateHash = true){
     current = Math.max(0, Math.min(slides.length - 1, index));
@@ -252,6 +350,7 @@
     if (updateHash) {
       history.replaceState(null, '', '#' + (current + 1));
     }
+    broadcastState();
   }
 
   function nextSlide(){ showSlide(current + 1); }

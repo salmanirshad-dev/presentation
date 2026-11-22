@@ -1,0 +1,325 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="theme-color" content="#0a0f1d">
+<title>Presentation Remote</title>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<style>
+  :root {
+    --bg: #090d16;
+    --card: #121826;
+    --card-border: #1f293d;
+    --text: #f1f5f9;
+    --muted: #64748b;
+    --blue: #2563eb;
+    --blue-glow: rgba(37, 99, 235, 0.4);
+    --green: #10b981;
+    --red: #ef4444;
+  }
+  * {
+    box-sizing: border-box;
+    margin: 0;
+    padding: 0;
+    -webkit-tap-highlight-color: transparent;
+    user-select: none;
+    -webkit-user-select: none;
+  }
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    min-height: 100vh;
+    min-height: 100dvh;
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between;
+    padding: clamp(16px, 4vw, 24px);
+    touch-action: manipulation;
+    overflow: hidden;
+  }
+
+  /* Header & Status */
+  .header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding-bottom: 12px;
+    border-bottom: 1px solid var(--card-border);
+  }
+  .title {
+    font-size: 15px;
+    font-weight: 700;
+    letter-spacing: -0.02em;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+  .status-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 12px;
+    font-weight: 600;
+    padding: 4px 10px;
+    border-radius: 100px;
+    background: rgba(255, 255, 255, 0.05);
+    border: 1px solid var(--card-border);
+  }
+  .dot {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    background: #eab308;
+    transition: background 0.3s;
+  }
+  .status-badge.connected .dot { background: var(--green); box-shadow: 0 0 8px var(--green); }
+  .status-badge.disconnected .dot { background: var(--red); }
+
+  /* Slide Counter Card */
+  .slide-info {
+    background: var(--card);
+    border: 1px solid var(--card-border);
+    border-radius: 18px;
+    padding: 16px;
+    text-align: center;
+    margin: 14px 0;
+  }
+  .slide-label {
+    font-size: 11px;
+    text-transform: uppercase;
+    letter-spacing: 0.15em;
+    color: var(--muted);
+    font-weight: 700;
+    margin-bottom: 4px;
+  }
+  .slide-numbers {
+    font-size: 32px;
+    font-weight: 850;
+    letter-spacing: -0.04em;
+    color: #fff;
+  }
+  .slide-progress {
+    width: 100%;
+    height: 6px;
+    background: #1e293b;
+    border-radius: 10px;
+    margin-top: 12px;
+    overflow: hidden;
+  }
+  .slide-progress-bar {
+    height: 100%;
+    width: 12.5%;
+    background: var(--blue);
+    border-radius: 10px;
+    transition: width 0.25s ease;
+  }
+
+  /* Fullscreen Bar */
+  .fs-btn {
+    width: 100%;
+    background: #172033;
+    border: 1px solid #28354f;
+    color: #cbd5e1;
+    font-size: 14px;
+    font-weight: 600;
+    padding: 14px 20px;
+    border-radius: 14px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    cursor: pointer;
+    transition: all 0.12s ease;
+  }
+  .fs-btn:active {
+    background: #2563eb;
+    color: #fff;
+    transform: scale(0.98);
+  }
+
+  /* Main Nav Buttons */
+  .nav-grid {
+    display: grid;
+    grid-template-columns: 1fr 1.35fr;
+    gap: 14px;
+    flex: 1;
+    margin: 14px 0;
+    min-height: 220px;
+  }
+  .btn-action {
+    border: none;
+    border-radius: 24px;
+    font-size: 22px;
+    font-weight: 800;
+    letter-spacing: -0.02em;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 10px;
+    cursor: pointer;
+    transition: transform 0.08s ease, filter 0.08s ease, box-shadow 0.08s ease;
+    touch-action: manipulation;
+  }
+  .btn-prev {
+    background: #182234;
+    border: 1.5px solid #293852;
+    color: #94a3b8;
+  }
+  .btn-prev:active {
+    transform: scale(0.96);
+    background: #202c42;
+    color: #fff;
+  }
+  .btn-next {
+    background: linear-gradient(135deg, #2563eb, #1d4ed8);
+    border: 1.5px solid #3b82f6;
+    color: #ffffff;
+    box-shadow: 0 8px 24px var(--blue-glow);
+  }
+  .btn-next:active {
+    transform: scale(0.96);
+    filter: brightness(1.15);
+    box-shadow: 0 4px 12px var(--blue-glow);
+  }
+  .btn-sub {
+    font-size: 12px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.1em;
+    opacity: 0.8;
+  }
+
+  /* Room details */
+  .footer-bar {
+    text-align: center;
+    font-size: 11px;
+    color: var(--muted);
+    padding-top: 8px;
+  }
+</style>
+</head>
+<body>
+
+  <header class="header">
+    <div class="title">
+      <span>📱</span> Presenter Remote
+    </div>
+    <div class="status-badge" id="status-badge">
+      <span class="dot"></span>
+      <span id="status-text">Connecting...</span>
+    </div>
+  </header>
+
+  <div class="slide-info">
+    <div class="slide-label">Smart Board Slide</div>
+    <div class="slide-numbers"><span id="curr-slide">1</span> <span style="color:var(--muted);font-weight:400">/</span> <span id="total-slides">8</span></div>
+    <div class="slide-progress">
+      <div class="slide-progress-bar" id="progress-bar"></div>
+    </div>
+  </div>
+
+  <button class="fs-btn" id="btn-fullscreen">
+    <span>⛶</span> Toggle Fullscreen on Screen
+  </button>
+
+  <div class="nav-grid">
+    <button class="btn-action btn-prev" id="btn-prev">
+      <span style="font-size:36px">‹</span>
+      <span>Left</span>
+      <span class="btn-sub">Previous</span>
+    </button>
+    <button class="btn-action btn-next" id="btn-next">
+      <span style="font-size:36px">›</span>
+      <span>Right</span>
+      <span class="btn-sub">Next Slide</span>
+    </button>
+  </div>
+
+  <div class="footer-bar">
+    Room: <strong id="room-name" style="color:#94a3b8">...</strong> · Sub-40ms Supabase Realtime
+  </div>
+
+<script>
+  const SUPABASE_URL = 'https://ytyuucutzaqjjsqjviyq.supabase.co';
+  const SUPABASE_ANON_KEY = 'sb_publishable_MMO2PmIOpVuNgBiXGn2rzQ_28pbPcJn';
+
+  // Room pairing code from URL (e.g. ?room=ku07)
+  const params = new URLSearchParams(window.location.search);
+  const room = params.get('room') || 'math07';
+  document.getElementById('room-name').textContent = room;
+
+  const statusBadge = document.getElementById('status-badge');
+  const statusText = document.getElementById('status-text');
+  const currSlideEl = document.getElementById('curr-slide');
+  const totalSlidesEl = document.getElementById('total-slides');
+  const progressBar = document.getElementById('progress-bar');
+
+  // Supabase Client
+  const client = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
+    realtime: { params: { eventsPerSecond: 20 } }
+  });
+
+  const channel = client.channel(`presentation-${room}`, {
+    config: { broadcast: { ack: false } }
+  });
+
+  function updateSlide(current, total) {
+    currSlideEl.textContent = current;
+    totalSlidesEl.textContent = total;
+    const pct = (current / total) * 100;
+    progressBar.style.width = pct + '%';
+  }
+
+  // Listen for slide updates broadcast from the Smart Board
+  channel
+    .on('broadcast', { event: 'slide-state' }, ({ payload }) => {
+      if (payload && payload.current && payload.total) {
+        updateSlide(payload.current, payload.total);
+      }
+    })
+    .subscribe((status) => {
+      if (status === 'SUBSCRIBED') {
+        statusBadge.className = 'status-badge connected';
+        statusText.textContent = 'Connected';
+        // Request current state from board
+        sendAction('sync');
+      } else if (status === 'CLOSED' || status === 'CHANNEL_ERROR') {
+        statusBadge.className = 'status-badge disconnected';
+        statusText.textContent = 'Disconnected';
+      }
+    });
+
+  function sendAction(action) {
+    if (navigator.vibrate) {
+      navigator.vibrate(25);
+    }
+    channel.send({
+      type: 'broadcast',
+      event: 'slide-action',
+      payload: { action }
+    });
+  }
+
+  // Fast Touch / Click bindings
+  document.getElementById('btn-prev').addEventListener('pointerdown', (e) => {
+    e.preventDefault();
+    sendAction('prev');
+  });
+
+  document.getElementById('btn-next').addEventListener('pointerdown', (e) => {
+    e.preventDefault();
+    sendAction('next');
+  });
+
+  document.getElementById('btn-fullscreen').addEventListener('pointerdown', (e) => {
+    e.preventDefault();
+    sendAction('fullscreen');
+  });
+</script>
+</body>
+</html>
