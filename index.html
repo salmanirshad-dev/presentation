@@ -84,7 +84,13 @@
     .slide,.slide.active{display:flex!important;width:100vw;height:100vh;min-height:0;aspect-ratio:auto;border:0;border-radius:0;box-shadow:none;position:relative;page-break-after:always;padding:7% 8%;animation:none}
     .slide.active > *{animation:none}
     .footer{bottom:28px;left:8%;right:8%}
+    .nav-controls{display:none!important}
   }
+  .nav-controls{position:fixed;bottom:20px;right:24px;display:flex;gap:8px;z-index:99;opacity:0.35;transition:opacity .2s}
+  .nav-controls:hover{opacity:1}
+  .nav-btn{width:38px;height:38px;border-radius:10px;border:1px solid var(--line);background:rgba(255,255,255,0.85);backdrop-filter:blur(6px);color:var(--ink);cursor:pointer;display:grid;place-items:center;font-size:16px;user-select:none;transition:background .15s,transform .15s}
+  .nav-btn:hover{background:#fff;transform:scale(1.05);border-color:#b9c9f5}
+  .nav-btn:active{transform:scale(0.95)}
 </style>
 </head>
 <body>
@@ -229,20 +235,75 @@
     <div class="footer"><span>Salman Irshad · Roll No. 07 · Mathematics</span><span>08</span></div>
   </section>
 </main>
+
+<div class="nav-controls" aria-label="Slide navigation">
+  <button class="nav-btn" id="btn-prev" title="Previous (Left Arrow / PageUp)">‹</button>
+  <button class="nav-btn" id="btn-next" title="Next (Right Arrow / PageDown / Space)">›</button>
+  <button class="nav-btn" id="btn-fs" title="Toggle Fullscreen (F)">⛶</button>
+</div>
+
 <script>
   const slides = [...document.querySelectorAll('.slide')];
   let current = 0;
-  function showSlide(index){
+
+  function showSlide(index, updateHash = true){
     current = Math.max(0, Math.min(slides.length - 1, index));
     slides.forEach((slide, i) => slide.classList.toggle('active', i === current));
-    // Slide navigation is keyboard-based; no persistent toolbar is shown.
+    if (updateHash) {
+      history.replaceState(null, '', '#' + (current + 1));
+    }
   }
+
   function nextSlide(){ showSlide(current + 1); }
   function prevSlide(){ showSlide(current - 1); }
+
+  function toggleFullscreen(){
+    if(!document.fullscreenElement){
+      document.documentElement.requestFullscreen().catch(()=>{});
+    } else {
+      document.exitFullscreen().catch(()=>{});
+    }
+  }
+
+  // Keyboard navigation & Clicker support
   document.addEventListener('keydown', e => {
-    if(e.key === 'ArrowRight' || e.key === ' '){ e.preventDefault(); nextSlide(); }
-    if(e.key === 'ArrowLeft'){ prevSlide(); }
+    if(['ArrowRight', 'ArrowDown', 'PageDown', ' ', 'Enter', 'n', 'N'].includes(e.key)){
+      e.preventDefault();
+      nextSlide();
+    } else if(['ArrowLeft', 'ArrowUp', 'PageUp', 'Backspace', 'p', 'P'].includes(e.key)){
+      e.preventDefault();
+      prevSlide();
+    } else if(e.key === 'f' || e.key === 'F'){
+      e.preventDefault();
+      toggleFullscreen();
+    }
   });
+
+  // Touch Swipe Support
+  let touchStartX = 0;
+  let touchEndX = 0;
+  document.addEventListener('touchstart', e => {
+    touchStartX = e.changedTouches[0].screenX;
+  }, {passive:true});
+  document.addEventListener('touchend', e => {
+    touchEndX = e.changedTouches[0].screenX;
+    const diff = touchEndX - touchStartX;
+    if (Math.abs(diff) > 50) {
+      if (diff < 0) nextSlide();
+      else prevSlide();
+    }
+  }, {passive:true});
+
+  // Button handlers
+  document.getElementById('btn-prev').addEventListener('click', prevSlide);
+  document.getElementById('btn-next').addEventListener('click', nextSlide);
+  document.getElementById('btn-fs').addEventListener('click', toggleFullscreen);
+
+  // Restore slide from URL hash on load
+  const hash = parseInt(window.location.hash.replace('#', ''), 10);
+  if (!isNaN(hash) && hash >= 1 && hash <= slides.length) {
+    showSlide(hash - 1, false);
+  }
 </script>
 </body>
 </html>
